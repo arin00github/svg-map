@@ -1,98 +1,86 @@
 import 'ol/ol.css';
-import MVT from 'ol/format/MVT';
+import Feature from 'ol/Feature';
 import Map from 'ol/Map';
-import VectorTileLayer from 'ol/layer/VectorTile';
-import VectorTileSource from 'ol/source/VectorTile';
+import Point from 'ol/geom/Point';
 import View from 'ol/View';
-import {Fill, Stroke, Style} from 'ol/style';
+import {Circle as CircleStyle, Stroke, Style} from 'ol/style';
+import {OSM, Vector as VectorSource} from 'ol/source';
+import {Tile as TileLayer, Vector as VectorLayer} from 'ol/layer';
+import {easeOut} from 'ol/easing';
+import {fromLonLat} from 'ol/proj';
+import {getVectorContext} from 'ol/render';
+import {unByKey} from 'ol/Observable';
 
-// lookup for selection objects
-var selection = {};
-
-var country = new Style({
-  stroke: new Stroke({
-    color: 'gray',
-    width: 1,
+var tileLayer = new TileLayer({
+  source: new OSM({
+    wrapX: false,
   }),
-  fill: new Fill({
-    color: 'rgba(20,20,20,0.9)',
-  }),
-});
-var selectedCountry = new Style({
-  stroke: new Stroke({
-    color: 'rgba(200,20,20,0.8)',
-    width: 2,
-  }),
-  fill: new Fill({
-    color: 'rgba(200,20,20,0.4)',
-  }),
-});
-
-var vtLayer = new VectorTileLayer({
-  declutter: true,
-  source: new VectorTileSource({
-    maxZoom: 15,
-    format: new MVT({
-      idProperty: 'iso_a3',
-    }),
-    url:
-      'https://ahocevar.com/geoserver/gwc/service/tms/1.0.0/' +
-      'ne:ne_10m_admin_0_countries@EPSG%3A900913@pbf/{z}/{x}/{-y}.pbf',
-  }),
-  style: country,
 });
 
 var map = new Map({
-  layers: [vtLayer],
+  layers: [tileLayer],
   target: 'map',
   view: new View({
     center: [0, 0],
-    zoom: 2,
+    zoom: 1,
     multiWorld: true,
   }),
 });
 
-// Selection
-var selectionLayer = new VectorTileLayer({
-  map: map,
-  renderMode: 'vector',
-  source: vtLayer.getSource(),
-  style: function (feature) {
-    if (feature.getId() in selection) {
-      return selectedCountry;
-    }
-  },
+var source = new VectorSource({
+  wrapX: false,
 });
+var vector = new VectorLayer({
+  source: source,
+});
+map.addLayer(vector);
 
-var selectElement = document.getElementById('type');
+function addRandomFeature() {
+  var x = Math.random() * 360 - 180;
+  var y = Math.random() * 180 - 90;
+  var geom = new Point(fromLonLat([x, y]));
+  var feature = new Feature(geom);
+  source.addFeature(feature);
+}
 
-map.on(['click', 'pointermove'], function (event) {
-  if (
-    (selectElement.value === 'singleselect-hover' &&
-      event.type !== 'pointermove') ||
-    (selectElement.value !== 'singleselect-hover' &&
-      event.type === 'pointermove')
-  ) {
-    return;
+var duration = 3000;
+function flash(feature) {
+  var start = new Date().getTime();
+  var listenerKey = tileLayer.on('postrender', animate);
+
+  function animate(event) {
+    var vectorContext = getVectorContext(event);
+    var frameState = event.frameState;
+    var flashGeom = feature.getGeometry().clone();
+    var elapsed = frameState.time - start;
+    var elapsedRatio = elapsed / duration;
+    // radius will be 5 at start and 30 at end.
+    var radius = easeOut(elapsedRatio) * 25 + 5;
+    var opacity = easeOut(1 - elapsedRatio);
+
+    var style = new Style({
+      image: new CircleStyle({
+        radius: radius,
+        stroke: new Stroke({
+          color: 'rgba(255, 0, 0, ' + opacity + ')',
+          width: 0.25 + opacity,
+        }),
+      }),
+    });
+
+    vectorContext.setStyle(style);
+    vectorContext.drawGeometry(flashGeom);
+    if (elapsed > duration) {
+      unByKey(listenerKey);
+      return;
+    }
+    // tell OpenLayers to continue postrender animation
+    map.render();
   }
-  vtLayer.getFeatures(event.pixel).then(function (features) {
-    if (!features.length) {
-      selection = {};
-      selectionLayer.changed();
-      return;
-    }
-    var feature = features[0];
-    if (!feature) {
-      return;
-    }
-    var fid = feature.getId();
+}
 
-    if (selectElement.value.startsWith('singleselect')) {
-      selection = {};
-    }
-    // add selected feature to lookup
-    selection[fid] = feature;
-
-    selectionLayer.changed();
-  });
+source.on('addfeature', function (e) {
+  flash(e.feature);
 });
+
+window.setInterval(addRandomFeature, 1000);
