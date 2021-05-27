@@ -2,6 +2,7 @@
   "name": "openlayer_geojson",
   "version": "1.0.0",
   "description": "",
+  "main": "main.js",
   "scripts": {
     "start": "parcel index.html",
     "build": "parcel build --public-url . index.html"
