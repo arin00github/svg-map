@@ -1,224 +1,98 @@
 import 'ol/ol.css';
-import Circle from 'ol/geom/Circle';
-import Feature from 'ol/Feature';
-import GeoJSON from 'ol/format/GeoJSON';
+import MVT from 'ol/format/MVT';
 import Map from 'ol/Map';
+import VectorTileLayer from 'ol/layer/VectorTile';
+import VectorTileSource from 'ol/source/VectorTile';
 import View from 'ol/View';
-import {Circle as CircleStyle, Fill, Stroke, Style} from 'ol/style';
-import {OSM, Vector as VectorSource} from 'ol/source';
-import {Tile as TileLayer, Vector as VectorLayer} from 'ol/layer';
+import {Fill, Stroke, Style} from 'ol/style';
 
-var image = new CircleStyle({
-  radius: 5,
-  fill: null,
-  stroke: new Stroke({color: 'red', width: 1}),
+// lookup for selection objects
+var selection = {};
+
+var country = new Style({
+  stroke: new Stroke({
+    color: 'gray',
+    width: 1,
+  }),
+  fill: new Fill({
+    color: 'rgba(20,20,20,0.9)',
+  }),
+});
+var selectedCountry = new Style({
+  stroke: new Stroke({
+    color: 'rgba(200,20,20,0.8)',
+    width: 2,
+  }),
+  fill: new Fill({
+    color: 'rgba(200,20,20,0.4)',
+  }),
 });
 
-var styles = {
-  'Point': new Style({
-    image: image,
+var vtLayer = new VectorTileLayer({
+  declutter: true,
+  source: new VectorTileSource({
+    maxZoom: 15,
+    format: new MVT({
+      idProperty: 'iso_a3',
+    }),
+    url:
+      'https://ahocevar.com/geoserver/gwc/service/tms/1.0.0/' +
+      'ne:ne_10m_admin_0_countries@EPSG%3A900913@pbf/{z}/{x}/{-y}.pbf',
   }),
-  'LineString': new Style({
-    stroke: new Stroke({
-      color: 'green',
-      width: 1,
-    }),
-  }),
-  'MultiLineString': new Style({
-    stroke: new Stroke({
-      color: 'green',
-      width: 1,
-    }),
-  }),
-  'MultiPoint': new Style({
-    image: image,
-  }),
-  'MultiPolygon': new Style({
-    stroke: new Stroke({
-      color: 'yellow',
-      width: 1,
-    }),
-    fill: new Fill({
-      color: 'rgba(255, 255, 0, 0.1)',
-    }),
-  }),
-  'Polygon': new Style({
-    stroke: new Stroke({
-      color: 'blue',
-      lineDash: [4],
-      width: 3,
-    }),
-    fill: new Fill({
-      color: 'rgba(0, 0, 255, 0.1)',
-    }),
-  }),
-  'GeometryCollection': new Style({
-    stroke: new Stroke({
-      color: 'magenta',
-      width: 2,
-    }),
-    fill: new Fill({
-      color: 'magenta',
-    }),
-    image: new CircleStyle({
-      radius: 10,
-      fill: null,
-      stroke: new Stroke({
-        color: 'magenta',
-      }),
-    }),
-  }),
-  'Circle': new Style({
-    stroke: new Stroke({
-      color: 'red',
-      width: 2,
-    }),
-    fill: new Fill({
-      color: 'rgba(255,0,0,0.2)',
-    }),
-  }),
-};
-
-var styleFunction = function (feature) {
-  return styles[feature.getGeometry().getType()];
-};
-
-var geojsonObject = {
-  'type': 'FeatureCollection',
-  'crs': {
-    'type': 'name',
-    'properties': {
-      'name': 'EPSG:3857',
-    },
-  },
-  'features': [
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'Point',
-        'coordinates': [0, 0],
-      },
-    },
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'LineString',
-        'coordinates': [
-          [4e6, -2e6],
-          [8e6, 2e6] ],
-      },
-    },
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'LineString',
-        'coordinates': [
-          [4e6, 2e6],
-          [8e6, -2e6] ],
-      },
-    },
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'Polygon',
-        'coordinates': [
-          [
-            [-5e6, -1e6],
-            [-4e6, 1e6],
-            [-3e6, -1e6] ] ],
-      },
-    },
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'MultiLineString',
-        'coordinates': [
-          [
-            [-1e6, -7.5e5],
-            [-1e6, 7.5e5] ],
-          [
-            [1e6, -7.5e5],
-            [1e6, 7.5e5] ],
-          [
-            [-7.5e5, -1e6],
-            [7.5e5, -1e6] ],
-          [
-            [-7.5e5, 1e6],
-            [7.5e5, 1e6] ] ],
-      },
-    },
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'MultiPolygon',
-        'coordinates': [
-          [
-            [
-              [-5e6, 6e6],
-              [-5e6, 8e6],
-              [-3e6, 8e6],
-              [-3e6, 6e6] ] ],
-          [
-            [
-              [-2e6, 6e6],
-              [-2e6, 8e6],
-              [0, 8e6],
-              [0, 6e6] ] ],
-          [
-            [
-              [1e6, 6e6],
-              [1e6, 8e6],
-              [3e6, 8e6],
-              [3e6, 6e6] ] ] ],
-      },
-    },
-    {
-      'type': 'Feature',
-      'geometry': {
-        'type': 'GeometryCollection',
-        'geometries': [
-          {
-            'type': 'LineString',
-            'coordinates': [
-              [-5e6, -5e6],
-              [0, -5e6] ],
-          },
-          {
-            'type': 'Point',
-            'coordinates': [4e6, -5e6],
-          },
-          {
-            'type': 'Polygon',
-            'coordinates': [
-              [
-                [1e6, -6e6],
-                [2e6, -4e6],
-                [3e6, -6e6] ] ],
-          } ],
-      },
-    } ],
-};
-
-var vectorSource = new VectorSource({
-  features: new GeoJSON().readFeatures(geojsonObject),
-});
-
-vectorSource.addFeature(new Feature(new Circle([5e6, 7e6], 1e6)));
-
-var vectorLayer = new VectorLayer({
-  source: vectorSource,
-  style: styleFunction,
+  style: country,
 });
 
 var map = new Map({
-  layers: [
-    new TileLayer({
-      source: new OSM(),
-    }),
-    vectorLayer ],
+  layers: [vtLayer],
   target: 'map',
   view: new View({
     center: [0, 0],
     zoom: 2,
+    multiWorld: true,
   }),
+});
+
+// Selection
+var selectionLayer = new VectorTileLayer({
+  map: map,
+  renderMode: 'vector',
+  source: vtLayer.getSource(),
+  style: function (feature) {
+    if (feature.getId() in selection) {
+      return selectedCountry;
+    }
+  },
+});
+
+var selectElement = document.getElementById('type');
+
+map.on(['click', 'pointermove'], function (event) {
+  if (
+    (selectElement.value === 'singleselect-hover' &&
+      event.type !== 'pointermove') ||
+    (selectElement.value !== 'singleselect-hover' &&
+      event.type === 'pointermove')
+  ) {
+    return;
+  }
+  vtLayer.getFeatures(event.pixel).then(function (features) {
+    if (!features.length) {
+      selection = {};
+      selectionLayer.changed();
+      return;
+    }
+    var feature = features[0];
+    if (!feature) {
+      return;
+    }
+    var fid = feature.getId();
+
+    if (selectElement.value.startsWith('singleselect')) {
+      selection = {};
+    }
+    // add selected feature to lookup
+    selection[fid] = feature;
+
+    selectionLayer.changed();
+  });
 });
